@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo "GitHub Repository Setup Commands"
+echo "================================"
+echo ""
+echo "After creating your GitHub repository, run these commands:"
+echo ""
+echo "# Add the remote repository (replace with your actual URL)"
+echo "git remote add origin https://github.com/YOURUSERNAME/esp32-epaper-photo-frame.git"
+echo ""
+echo "# Push to GitHub"
+echo "git branch -M main"
+echo "git push -u origin main"
+echo ""
+echo "Your repository should then be ready for Railway deployment!"

@@ -153,6 +153,13 @@ def status():
 @app.route('/wakeup-interval', methods=['GET'])
 def wakeup_interval():
     """Return the interval until next wakeup based on time schedule."""
+    # Check if force_update flag is set
+    force_update = request.args.get('force', 'false').lower() == 'true'
+    
+    if force_update:
+        # Return 5 seconds for immediate update
+        return jsonify(interval=5)
+    
     now = datetime.now()
     current_time = now.time()
 
@@ -168,6 +175,14 @@ def wakeup_interval():
         interval = int((next_morning - now).total_seconds())
 
     return jsonify(interval=interval)
+
+@app.route('/force-update', methods=['POST'])
+def force_update():
+    """Force ESP32 to wake up immediately on next wakeup interval call."""
+    return jsonify({
+        "message": "Next wakeup interval request will trigger immediate update",
+        "instruction": "Use /wakeup-interval?force=true to get 5 second interval"
+    })
 
 @app.route('/sync-google-photos', methods=['POST'])
 def sync_google_photos():
