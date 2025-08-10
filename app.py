@@ -1,11 +1,13 @@
 import os
 import tempfile
 import base64
+import random
 from datetime import datetime, time, timedelta
 from flask import Flask, request, jsonify, render_template
 from PIL import Image
 import numpy as np
 from io import BytesIO
+from google_photos_sync import GooglePhotosSync, get_album_id_from_url
 
 app = Flask(__name__)
 
@@ -13,6 +15,9 @@ app = Flask(__name__)
 processed_images = []
 sent_images = []
 current_image_index = 0
+
+# Google Photos sync instance
+google_sync = GooglePhotosSync()
 
 # Define the 7-color palette mapping
 color_palette = {
@@ -125,9 +130,8 @@ def get_img_data():
     if not processed_images:
         return jsonify({"error": "No images available"}), 404
     
-    # Get next image (cycle through available images)
-    image = processed_images[current_image_index % len(processed_images)]
-    current_image_index = (current_image_index + 1) % len(processed_images)
+    # Randomly select an image instead of cycling through them
+    image = random.choice(processed_images)
     
     # Track sent images
     if image not in sent_images:
@@ -164,6 +168,63 @@ def wakeup_interval():
         interval = int((next_morning - now).total_seconds())
 
     return jsonify(interval=interval)
+
+@app.route('/sync-google-photos', methods=['POST'])
+def sync_google_photos():
+    """Sync photos from Google Photos album."""
+    try:
+        # Get the share URL from request or environment variable
+        data = request.get_json() or {}
+        share_url = data.get('album_url') or os.getenv('GOOGLE_ALBUM_URL')
+        
+        if not share_url:
+            return jsonify({"error": "No Google Photos album URL provided"}), 400
+        
+        # Extract album ID from share URL
+        album_id = get_album_id_from_url(share_url)
+        if album_id:
+            os.environ['GOOGLE_ALBUM_ID'] = album_id
+            google_sync.album_id = album_id
+        
+        # Sync photos from the album
+        new_photos = google_sync.sync_album_photos(process_image, max_photos=20)
+        
+        if new_photos:
+            # Add to processed images (avoiding duplicates by Google ID)
+            existing_ids = {img.get('google_id') for img in processed_images if img.get('google_id')}
+            
+            for photo in new_photos:
+                if photo.get('google_id') not in existing_ids:
+                    processed_images.append(photo)
+            
+            return jsonify({
+                "message": f"Successfully synced {len(new_photos)} photos from Google Photos",
+                "total_images": len(processed_images)
+            })
+        else:
+            return jsonify({"message": "No new photos found or sync failed"}), 200
+            
+    except Exception as e:
+        return jsonify({"error": f"Google Photos sync failed: {str(e)}"}), 500
+
+@app.route('/setup-google-auth', methods=['GET'])
+def setup_google_auth():
+    """Provide instructions for setting up Google Photos API access."""
+    instructions = {
+        "step1": "Go to Google Cloud Console (https://console.cloud.google.com/)",
+        "step2": "Create a new project or select existing one",
+        "step3": "Enable Google Photos Library API",
+        "step4": "Create OAuth 2.0 credentials",
+        "step5": "Set environment variables in Railway:",
+        "required_env_vars": [
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET", 
+            "GOOGLE_REFRESH_TOKEN",
+            "GOOGLE_ALBUM_URL (your shared album URL)"
+        ],
+        "oauth_redirect_url": f"{request.url_root}auth/callback"
+    }
+    return jsonify(instructions)
 
 @app.route('/clear-images', methods=['POST'])
 def clear_images():

@@ -47,6 +47,18 @@
         .btn:hover {
             background-color: #0056b3;
         }
+        .btn.google {
+            background-color: #4285f4;
+        }
+        .btn.google:hover {
+            background-color: #357ae8;
+        }
+        .btn.danger {
+            background-color: #dc3545;
+        }
+        .btn.danger:hover {
+            background-color: #c82333;
+        }
         .status {
             margin: 20px 0;
             padding: 15px;
@@ -70,12 +82,32 @@
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+        .google-section {
+            border-top: 2px solid #eee;
+            margin-top: 30px;
+            padding-top: 30px;
+        }
+        .input-group {
+            margin: 15px 0;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📸 E-Paper Photo Frame Upload</h1>
-        <p>Upload photos of you and your girlfriend to display on your E-Paper frame!</p>
+        <p>Upload photos to display on your E-Paper frame!</p>
         
         <div class="upload-area" onclick="document.getElementById('fileInput').click()">
             <p>📁 Drag and drop images here or click to select</p>
@@ -88,7 +120,35 @@
         
         <div style="text-align: center; margin-top: 20px;">
             <button class="btn" onclick="checkStatus()">Check Status</button>
-            <button class="btn" onclick="clearImages()" style="background-color: #dc3545;">Clear All Images</button>
+            <button class="btn danger" onclick="clearImages()">Clear All Images</button>
+        </div>
+        
+        <div class="google-section">
+            <h2>🔄 Google Photos Auto-Sync</h2>
+            <p>Automatically sync photos from your Google Photos album!</p>
+            
+            <div class="input-group">
+                <label for="albumUrl">Google Photos Album Share URL:</label>
+                <input type="url" id="albumUrl" placeholder="https://photos.app.goo.gl/xxxxx" 
+                       value="https://photos.app.goo.gl/oYB3asyonpz8Egbq8">
+            </div>
+            
+            <div style="text-align: center;">
+                <button class="btn google" onclick="syncGooglePhotos()">Sync Google Photos</button>
+                <button class="btn" onclick="showGoogleSetup()">Setup Instructions</button>
+            </div>
+            
+            <div id="googleInstructions" style="display: none; margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+                <h3>Google Photos API Setup:</h3>
+                <ol>
+                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                    <li>Create a new project or select existing one</li>
+                    <li>Enable "Google Photos Library API"</li>
+                    <li>Create OAuth 2.0 credentials</li>
+                    <li>Set environment variables in Railway deployment</li>
+                </ol>
+                <p><strong>Note:</strong> This requires API setup. For now, you can use manual upload above.</p>
+            </div>
         </div>
         
         <div id="serverStatus" style="margin-top: 20px;"></div>
@@ -195,6 +255,43 @@
                         checkStatus();
                     });
             }
+        }
+
+        function syncGooglePhotos() {
+            const albumUrl = document.getElementById('albumUrl').value;
+            if (!albumUrl) {
+                showStatus('Please enter a Google Photos album URL', 'error');
+                return;
+            }
+
+            showStatus('🔄 Syncing photos from Google Photos...', 'success');
+
+            fetch('/sync-google-photos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    album_url: albumUrl
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showStatus(`❌ Sync failed: ${data.error}`, 'error');
+                } else {
+                    showStatus(`✅ ${data.message}`, 'success');
+                    checkStatus();
+                }
+            })
+            .catch(error => {
+                showStatus(`❌ Sync failed: ${error.message}`, 'error');
+            });
+        }
+
+        function showGoogleSetup() {
+            const instructions = document.getElementById('googleInstructions');
+            instructions.style.display = instructions.style.display === 'none' ? 'block' : 'none';
         }
 
         // Load status on page load
